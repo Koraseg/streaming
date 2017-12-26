@@ -3,6 +3,7 @@ package org.koraseg.upstream
 import java.io.{File, PrintWriter}
 import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
+import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicLong
 
 import scala.concurrent.duration._
@@ -30,8 +31,9 @@ class SiteActor(site: Site, spoolDir: Path, tempDir: Path) extends Actor with Ac
   val buffer = ArrayBuffer[String]()
 
   override def preStart(): Unit = {
-    context.system.scheduler.schedule(30 seconds, 30 seconds, self, FlushBuffer)
+    context.system.scheduler.scheduleOnce(ThreadLocalRandom.current().nextInt(21, 40) seconds, runnableFlush)
   }
+
 
   override def receive: Receive = {
     case ud @ UserData(event, ip, unix_time, url) if url == site =>
@@ -47,8 +49,16 @@ class SiteActor(site: Site, spoolDir: Path, tempDir: Path) extends Actor with Ac
 
   }
 
+  private def runnableFlush: Runnable = new Runnable {
+    override def run(): Unit = {
+      self ! FlushBuffer
+      Try(context.system.scheduler.scheduleOnce(ThreadLocalRandom.current().nextInt(21, 40) seconds, runnableFlush))
+    }
+  }
+
   private def flushBuffer(): Future[Unit] = {
-    val flushArray = new Array[String](buffer.size)
+    //use AnyRef to force System.arraycopy method usage
+    val flushArray = new Array[AnyRef](buffer.size)
     buffer.copyToArray(flushArray)
     buffer.clear()
     val res = Future(
@@ -56,12 +66,9 @@ class SiteActor(site: Site, spoolDir: Path, tempDir: Path) extends Actor with Ac
         Thread.sleep(randomDelay(10 seconds).toMillis)
         val tmpPath = Paths.get(tempDir.toString, s"${site}_${uuid}_${idCounter.incrementAndGet()}")
         val pw = new PrintWriter(tmpPath.toString)
-        val start = System.currentTimeMillis()
         pw.write(flushArray.mkString("\n"))
         pw.flush()
         pw.close()
-        val end = System.currentTimeMillis()
-        log.info(s"${end - start} seconds for flushing ${flushArray.size} records")
         log.info(s"${counter.addAndGet(flushArray.size)} messages are moved to the spool directory")
         Files.copy(tmpPath, Paths.get(spoolDir.toString, tmpPath.getFileName.toString))
         Files.delete(tmpPath)

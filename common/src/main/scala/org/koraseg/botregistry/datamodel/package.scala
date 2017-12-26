@@ -24,6 +24,11 @@ package object datamodel extends DefaultJsonProtocol {
 
   }
 
+
+  sealed trait Event
+  case object Click extends Event
+  case object Impression extends Event
+
   //adapt to strange representation of unix time in the input
   implicit object dateTimeConverter extends JsonFormat[DateTime] {
     override def write(dt: DateTime): JsValue = JsString((dt.getMillis / 1000).toString)
@@ -32,14 +37,13 @@ package object datamodel extends DefaultJsonProtocol {
     }
   }
 
-  sealed trait Event
-  case object Click extends Event
-  case object Impression extends Event
-
-
-  case class UserData(`type`: Event, ip: String, unix_time: DateTime, url: String)
   object UserData {
-    implicit val userDataFormat = jsonFormat4(UserData.apply)
+    implicit val userDataFormat: JsonFormat[UserData] = jsonFormat4(UserData.apply)
   }
+  case class UserData(`type`: Event, ip: String, unix_time: DateTime, url: String)
+
+
+
+
 
 }

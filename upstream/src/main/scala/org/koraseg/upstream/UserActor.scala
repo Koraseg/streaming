@@ -4,11 +4,12 @@ import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicLong
 
 import scala.concurrent.duration._
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef, Scheduler}
 import org.joda.time.DateTime
 import org.koraseg.botregistry.datamodel.{Click, Ip, Site, UserData}
 
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
 
 object UserActor {
@@ -21,16 +22,17 @@ class UserActor(ip: Ip, intervalMillis: Int, siteActors: Map[Site, ActorRef]) ex
   import context.dispatcher
   require(intervalMillis > 0)
 
-
-  def runnableFire: Runnable = new Runnable {
+  def runnableFire(scheduler: Scheduler): Runnable = new Runnable {
     override def run(): Unit = {
       self ! Fire
-      context.system.scheduler.scheduleOnce(randomDelay(2 * intervalMillis millis), runnableFire)
+      Try(scheduler.scheduleOnce(randomDelay(2 * intervalMillis millis), runnableFire(scheduler)))
+
     }
   }
 
   override def preStart(): Unit = {
-    context.system.scheduler.scheduleOnce(randomDelay(2 * intervalMillis millis), runnableFire)
+    val scheduler = context.system.scheduler
+    scheduler.scheduleOnce(randomDelay(2 * intervalMillis millis), runnableFire(scheduler))
     //context.system.scheduler.schedule(randomDelay(), intervalMillis milliseconds, self, Fire)
   }
 
