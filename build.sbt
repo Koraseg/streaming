@@ -65,7 +65,11 @@ lazy val upstream = (project in file("upstream"))
   .dependsOn(common)
   .settings(commonSettings: _*)
   .settings(
-    libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.16"
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor" % "2.3.16",
+      "com.typesafe.akka" %% "akka-slf4j" % "2.3.16",
+      "ch.qos.logback" % "logback-classic" % "1.0.13"
+    )
   )
 
 
